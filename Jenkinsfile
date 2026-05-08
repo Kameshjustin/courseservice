@@ -1,70 +1,93 @@
 pipeline {
     agent any
-
+ 
     environment {
-        REPO_URL = 'https://github.com/Kameshjustin/courseservice.git'
-        IMAGE_NAME = 'course-service'
-        CONTAINER_NAME = 'course-service'
+        SCANNER_HOME = tool 'sonar-scanner'
+        IMAGE_NAME = "my-app"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        HARBOR_URL = "192.168.1.44"
+        PROJECT    = "library"
+ 
     }
-
+ 
     stages {
-        stage('Checkout Code') {
+ 
+        stage('Git checkout') {
             steps {
-                echo 'Checking out source code from private GitHub repo...'
-                // Use Jenkins credentials (create one ID: github_credentials)
                 git branch: 'main',
-                    url: "${REPO_URL}",
-                    credentialsId: 'git-cred-akjus'
+                    credentialsId: 'git-cred',
+                    url: 'https://github.com/peakyblinder0509/crm-backend-gatewayservice.git'
             }
         }
-
-        stage('Clean Old Containers & Images') {
+ 
+        stage('Sonar Scan') {
             steps {
-                script {
-                    echo 'Cleaning old Docker containers and images...'
+                withSonarQubeEnv('sonar') {
+                    sh """
+                    ${SCANNER_HOME}/bin/sonar-scanner \
+                    -Dsonar.projectKey=gatewayservice \
+                    -Dsonar.sources=.
+                    """
+                }
+            }
+        }
+ 
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 1, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+ 
+        stage('Image Build') {
+            steps {
+                dir('gatewayservice') {
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                }
+            }
+        }
+        stage('Tag Docker Image') {
+            steps {
+                sh """
+                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${HARBOR_URL}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}
+     
+                    """
+                   }
+                 }
+        stage('Docker Login Harbor') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'harbor-creds',
+                    usernameVariable: 'HARBOR_USER',
+                    passwordVariable: 'HARBOR_PASS'
+                )]) {
+ 
                     sh '''
-                    docker rm -f ${CONTAINER_NAME} || true
-                    docker image rm ${IMAGE_NAME}:latest || true
+                    docker login $HARBOR_URL \
+                    -u $HARBOR_USER \
+                    -p $HARBOR_PASS
                     '''
                 }
             }
         }
-
-        stage('Build Docker Image') {
+ 
+        stage('Push To Harbor') {
             steps {
-                script {
-                    echo 'Building Docker image for Course Service...'
-                    sh 'docker build -t ${IMAGE_NAME}:latest .'
-                }
+                sh 'docker push ${HARBOR_URL}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}'
             }
-        }
-
-        stage('Run with Docker Compose') {
-            steps {
-                script {
-                    echo 'Starting Course Service and dependencies using docker-compose...'
-                    sh 'docker-compose down || true'
-                    sh 'docker-compose up -d --build'
-                }
-            }
-        }
-
-        stage('Verify Running Container') {
-            steps {
-                script {
-                    echo ' Checking running container status...'
-                    sh 'docker ps | grep ${CONTAINER_NAME} || true'
-                }
-            }
-        }
+        }     
     }
-
+ 
     post {
-        success {
-            echo 'Course Service deployed successfully via Jenkins!'
-        }
-        failure {
-            echo 'Jenkins pipeline failed. Please check logs.'
+        always {
+            sh '''
+            echo "Removing only old images of my-app..."
+            docker images my-app --format "{{.Tag}}" | grep -v "${BUILD_NUMBER}" | while read tag; do
+                echo "Removing my-app:$tag"
+                docker rmi my-app:$tag || true
+            done
+            '''
         }
     }
 }
