@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -56,16 +55,20 @@ pipeline {
         }
 
         stage('Docker Login Harbor') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'harbor-cred',
-                    usernameVariable: 'HARBOR_USER',  
-                    passwordVariable: 'HARBOR_PASS'   
-                )]) {
-                    sh "docker login ${HARBOR_URL} -u $HARBOR_USER -p $HARBOR_PASS"
-                }
-            }
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'harbor-cred',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+        )]) {
+            sh '''
+                echo $HARBOR_PASS | docker login 16.171.210.247 \
+                --username $HARBOR_USER \
+                --password-stdin
+            '''
         }
+    }
+}
 
         stage('Push To Harbor') {
             steps {
