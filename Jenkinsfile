@@ -1,37 +1,36 @@
 pipeline {
     agent any
- 
+
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
-        IMAGE_NAME = "my-app"
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        HARBOR_URL = "192.168.1.44"
-        PROJECT    = "library"
- 
+        IMAGE_NAME   = "course-service"
+        IMAGE_TAG    = "${BUILD_NUMBER}"
+        HARBOR_URL   = "16.171.210.247"
+        PROJECT      = "library"
     }
- 
+
     stages {
- 
-        stage('Git checkout') {
+
+        stage('Git Checkout') {
             steps {
                 git branch: 'main',
-                    credentialsId: 'git-cred',
+                    credentialsId: 'git-cred-akjus',
                     url: 'https://github.com/peakyblinder0509/crm-backend-gatewayservice.git'
             }
         }
- 
+
         stage('Sonar Scan') {
             steps {
                 withSonarQubeEnv('sonar') {
                     sh """
                     ${SCANNER_HOME}/bin/sonar-scanner \
-                    -Dsonar.projectKey=gatewayservice \
+                    -Dsonar.projectKey=course-service \
                     -Dsonar.sources=.
                     """
                 }
             }
         }
- 
+
         stage('Quality Gate') {
             steps {
                 timeout(time: 1, unit: 'MINUTES') {
@@ -39,55 +38,47 @@ pipeline {
                 }
             }
         }
- 
+
         stage('Image Build') {
             steps {
-                dir('gatewayservice') {
-                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
-                }
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
+
         stage('Tag Docker Image') {
             steps {
-                sh """
-                docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${HARBOR_URL}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}
-     
-                    """
-                   }
-                 }
+                sh "docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${HARBOR_URL}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+
         stage('Docker Login Harbor') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'harbor-creds',
-                    usernameVariable: 'HARBOR_USER',
-                    passwordVariable: 'HARBOR_PASS'
+                    credentialsId: 'harbor-cred',
+                    usernameVariable: 'admin',
+                    passwordVariable: 'Harbor@123'
                 )]) {
- 
-                    sh '''
-                    docker login $HARBOR_URL \
-                    -u $HARBOR_USER \
-                    -p $HARBOR_PASS
-                    '''
+                    sh "docker login ${HARBOR_URL} -u $HARBOR_USER -p $HARBOR_PASS"
                 }
             }
         }
- 
+
         stage('Push To Harbor') {
             steps {
-                sh 'docker push ${HARBOR_URL}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}'
+                sh "docker push ${HARBOR_URL}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}"
             }
-        }     
-    }
- 
-    post {
-        always {
-            sh '''
-            echo "Removing only old images of my-app..."
-            docker images my-app --format "{{.Tag}}" | grep -v "${BUILD_NUMBER}" | while read tag; do
-                echo "Removing my-app:$tag"
-                docker rmi my-app:$tag || true
-            done
-            '''
         }
     }
-}
+
+    post {
+        always {
+            sh """
+            echo "Cleaning old images of ${IMAGE_NAME}..."
+            docker images ${IMAGE_NAME} --format '{{.Tag}}' | grep -v "${IMAGE_TAG}" | while read tag; do
+                echo "Removing ${IMAGE_NAME}:\$tag"
+                docker rmi ${IMAGE_NAME}:\$tag || true
+            done
+            """
+        }
+    }
+} 
