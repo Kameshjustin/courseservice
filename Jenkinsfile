@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SCANNER_HOME = tool 'sonar-scanner'
+        SONARQUBE     = "sonar-local"
         IMAGE_NAME   = "course-service"
         IMAGE_TAG    = "${BUILD_NUMBER}"
         HARBOR_URL   = "16.171.210.247"
@@ -19,14 +19,18 @@ pipeline {
             }
         }
 
-        stage('Sonar Scan') {
+       stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('sonar') {
-                    sh """
-                    ${SCANNER_HOME}/bin/sonar-scanner \
-                    -Dsonar.projectKey=course-service \
-                    -Dsonar.sources=.
-                    """
+                withSonarQubeEnv("${SONARQUBE}") {
+
+                    sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=course-service \
+                        -Dsonar.projectName="course-service" \
+                        -Dsonar.projectVersion=1.0 \
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions=node_modules/,build/
+                    '''
                 }
             }
         }
