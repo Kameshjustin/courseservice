@@ -1,12 +1,13 @@
+
 pipeline {
     agent any
 
     environment {
-        SONARQUBE     = "sonar-local"
-        IMAGE_NAME   = "course-service"
-        IMAGE_TAG    = "${BUILD_NUMBER}"
-        HARBOR_URL   = "16.171.210.247"
-        PROJECT      = "library"
+        SONARQUBE  = "sonar-local"
+        IMAGE_NAME = "course-service"
+        IMAGE_TAG  = "${BUILD_NUMBER}"
+        HARBOR_URL = "16.171.210.247"
+        PROJECT    = "library"
     }
 
     stages {
@@ -19,14 +20,13 @@ pipeline {
             }
         }
 
-       stage('SonarQube Analysis') {
+        stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv("${SONARQUBE}") {
-
                     sh '''
                         sonar-scanner \
                         -Dsonar.projectKey=course-service \
-                        -Dsonar.projectName="course-service" \
+                        -Dsonar.projectName=course-service \
                         -Dsonar.projectVersion=1.0 \
                         -Dsonar.sources=. \
                         -Dsonar.exclusions=node_modules/,build/
@@ -37,7 +37,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 3, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -59,8 +59,8 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'harbor-cred',
-                    usernameVariable: 'admin',
-                    passwordVariable: 'Harbor@123'
+                    usernameVariable: 'HARBOR_USER',  
+                    passwordVariable: 'HARBOR_PASS'   
                 )]) {
                     sh "docker login ${HARBOR_URL} -u $HARBOR_USER -p $HARBOR_PASS"
                 }
