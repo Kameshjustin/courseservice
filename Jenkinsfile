@@ -5,7 +5,7 @@ pipeline {
         SONARQUBE  = "sonar-local"
         IMAGE_NAME = "course-service"
         IMAGE_TAG  = "${BUILD_NUMBER}"
-        HARBOR_URL = "16.171.210.247:80"   // Port 80 = HTTP Harbor
+        HARBOR_URL = "16.171.210.247:80"   
         PROJECT    = "library"
     }
 
