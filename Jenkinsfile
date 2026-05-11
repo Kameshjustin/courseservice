@@ -15,7 +15,7 @@ pipeline {
             steps {
                 git branch: 'main',
                     credentialsId: 'git-cred-akjus',
-                    url: 'https://github.com/peakyblinder0509/crm-backend-gatewayservice.git'
+                    url: 'https://github.com/Kameshjustin/courseservice.git'
             }
         }
 
