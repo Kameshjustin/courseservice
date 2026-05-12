@@ -62,7 +62,7 @@ pipeline {
                     passwordVariable: 'HARBOR_PASS'
                 )]) {
                     sh '''
-                        echo "$HARBOR_PASS" | docker login http://16.171.210.247:80 \
+                        echo "$HARBOR_PASS" | docker login https://16.171.210.247:80 \
                             --username "$HARBOR_USER" \
                             --password-stdin
                     '''
