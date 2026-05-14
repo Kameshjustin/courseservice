@@ -5,8 +5,8 @@ pipeline {
         SONARQUBE  = "sonar-local"
         IMAGE_NAME = "course-service"
         IMAGE_TAG  = "${BUILD_NUMBER}"
-        HARBOR_URL = "16.171.210.247:80"   
-        PROJECT    = "library"
+        HARBOR_URL = "harbor-node1.com"
+        PROJECT    = "courseserviceproject"
     }
 
     stages {
@@ -54,43 +54,46 @@ pipeline {
             }
         }
 
-        stage('Docker Login Harbor') {
+        stage('Login and Push') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'harbor-cred',
-                    usernameVariable: 'HARBOR_USER',
-                    passwordVariable: 'HARBOR_PASS'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-credd',
+                        passwordVariable: 'HARBOR_PASSWORD',
+                        usernameVariable: 'HARBOR_USERNAME'
+                    )
+                ]) {
                     sh '''
-                        echo "$HARBOR_PASS" | docker login https://16.171.210.247:80 \
-                            --username "$HARBOR_USER" \
-                            --password-stdin
+                        echo "${HARBOR_PASSWORD}" | docker login ${HARBOR_URL} \
+                        -u "${HARBOR_USERNAME}" --password-stdin
+
+                        docker push ${HARBOR_URL}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}
                     '''
                 }
             }
         }
 
-        stage('Push To Harbor') {
-            steps {
-                sh "docker push ${HARBOR_URL}/${PROJECT}/${IMAGE_NAME}:${IMAGE_TAG}"
-            }
-        }
     }
 
     post {
+
         success {
             echo "Pipeline SUCCESS — ${IMAGE_NAME}:${IMAGE_TAG} pushed to Harbor"
         }
+
         failure {
             echo "Pipeline FAILED — check logs above"
         }
+
         always {
             sh """
                 echo "Cleaning old images of ${IMAGE_NAME}..."
+
                 docker images ${IMAGE_NAME} --format '{{.Tag}}' | grep -v '${IMAGE_TAG}' | while read tag; do
                     echo "Removing ${IMAGE_NAME}:\$tag"
                     docker rmi ${IMAGE_NAME}:\$tag || true
                 done
+
                 docker logout ${HARBOR_URL} || true
             """
         }
